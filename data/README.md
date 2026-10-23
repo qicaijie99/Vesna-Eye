@@ -12,3 +12,6 @@
   - `glowtrack_synth` 生成的合成图像序列与真值 CSV。
 - `calibration/`（运行时生成）
   - 棋盘格标定图像与输出相机内参。
+  - 其中 `chess_synth/` 由 `_recon/gen_chessboard.py` 生成的合成棋盘格（640x480，真实
+    fx=500、畸变已给定），用于回归验证 `glowtrack --mode calibrate`：
+    生成的 18 张图可标定出 fx≈505、RMS≈0.29 px（见 `docs/calibration.md`）。

@@ -15,6 +15,9 @@ out/
 results/
 data/synthetic/
 data/calibration/debug/
+data/calibration/debug_*/
+data/calibration/chess_synth/*.png
+data/calibration/chess/
 
 # Local video data is large; the two source clips can be copied into
 # data/videos/ manually (see README). The two reference clips are committed

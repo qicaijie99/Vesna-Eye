@@ -1,0 +1,35 @@
+# Build outputs
+build/
+build_*/
+vsbuild/
+out/
+*.exe
+*.pdb
+*.obj
+*.ilk
+*.exp
+*.lib
+.vs/
+
+# Generated artifacts (reproducible)
+results/
+data/synthetic/
+data/calibration/debug/
+
+# Local video data is large; the two source clips can be copied into
+# data/videos/ manually (see README). The two reference clips are committed
+# on purpose because they are small and needed for reproducible validation.
+*.mp4
+*.avi
+*.mkv
+*.mov
+!data/videos/*.mp4
+
+# Python scratch
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+.idea/
+*.swp

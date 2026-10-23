@@ -1,0 +1,83 @@
+# ---------------------------------------------------------------------------
+# Deployment config: OpenMV Cam H7 Plus (OV5640) + 2.8 mm lens, QVGA 320x240.
+#
+# Nominal intrinsics (must be replaced by a chessboard calibration in --mode
+# calibrate for best accuracy):
+#   pixel pitch 1.4 um, f = 2.8 mm  -> f_px = 2000 at full 2592x1944
+#   QVGA is 320x240 with the same field of view -> f_px = 2000 / (2592/320) ~= 247
+#   fx = fy = 247 px, principal point at (160, 120).
+# ---------------------------------------------------------------------------
+camera:
+  width: 320
+  height: 240
+  fx: 247.0
+  fy: 247.0
+  cx: 160.0
+  cy: 120.0
+  dist: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+target:
+  disc_diameter_mm: 50.0
+  glow_outer_diameter_mm: 62.0
+
+detector:
+  green_h_min: 35
+  green_h_max: 100
+  green_s_min: 60
+  green_v_min: 40
+  morph_open_ksize: 3
+  morph_close_ksize: 3
+  roi_search_enabled: true
+  roi_padding_scale: 2.5
+  roi_min_size_px: 40
+  min_area_px: 60
+  max_area_px: 60000
+  min_axis_ratio: 0.45
+  max_axis_ratio: 1.0
+  white_v_min: 200
+  white_s_max: 60
+  ring_inner_scale: 1.02
+  ring_outer_scale: 1.45
+  ring_samples: 48
+  ring_green_min_ratio: 0.55
+  score_threshold: 0.25
+  white_fallback_enabled: true
+
+pose:
+  min_distance_m: 0.05
+  max_distance_m: 20.0
+  max_reproj_rmse_px: 3.0
+  refine_iterations: 20
+  enable_ambiguity_resolution: true
+  ambiguity_cost_margin: 0.10
+
+kalman:
+  process_noise_angle: 0.0004
+  process_noise_rate: 0.04
+  meas_sigma_deg: 0.8
+  meas_sigma_scale_px: 25.0
+  gate_chi2: 13.8
+  max_prediction_frames: 15
+  quality_decay_per_frame: 0.9
+  range_process_noise: 0.01
+  range_meas_sigma_m: 0.05
+  latency_compensation_ms: 0.0
+
+tracker:
+  acquire_hits: 3
+  max_miss_frames: 15
+  full_search_interval: 5
+  prediction_growth_per_frame: 1.15
+  roi_min_size_px: 40
+
+output:
+  csv_enabled: true
+  csv_path: results/openmv_track.csv
+  overlay_enabled: false
+  overlay_video_path: results/openmv_overlay.mp4
+  serial_enabled: true
+  serial_port: COM3
+  serial_baud: 115200
+
+source: ""
+nominal_fps: 30.0

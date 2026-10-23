@@ -69,6 +69,21 @@ target:
 > 该尺寸只影响**距离**输出；`yaw/pitch` 对目标模型整体缩放不敏感（严格不变）。
 > 因此即使暂时没有实测值，也可以先用 50 mm 默认值部署角度输出，之后再校准距离。
 
+## 4.5 标定工具回归验证（已通过）
+
+仓库内 `data/calibration/chess_synth/` 提供 18 张合成棋盘格图像（真实内参 fx=fy=500，
+畸变 k1=-0.05/k2=0.03，9x6 角点、25 mm 方格），用于回归验证标定工具：
+
+```powershell
+.\build\Release\glowtrack.exe --mode calibrate --images data\calibration\chess_synth `
+    --cols 9 --rows 6 --square-mm 25 --out results\calib_synth.yaml
+# Calibration: 16 views, 640x480, RMS reprojection = 0.2903 px
+# 恢复内参 fx=505.08 / fy=504.68 / cx=316.47 / cy=240.11（真值 fx=500）
+```
+
+合成渲染下内参恢复误差约 1 %、RMS 0.29 px，说明角点检测/标定链路正确；
+真实相机请按 §3 采图标定并以 RMS < 0.5 px 为目标。
+
 ## 5. 标定质量自检
 
 - 用标定后的内参对一段已知棋盘格视频重投影，检查角点误差（`--debug-dir` 图）；

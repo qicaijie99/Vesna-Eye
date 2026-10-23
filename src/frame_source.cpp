@@ -66,13 +66,11 @@ bool isImageFile(const std::filesystem::path& path) {
          extension == ".bmp";
 }
 
-// Natural-order comparison so that frame_2.png sorts before frame_10.png.
-// Plain lexicographic ordering is kept for the non-numeric remainder, which
-// gives a strict weak ordering for unique file names.
-bool naturalLess(const std::filesystem::path& left,
-                 const std::filesystem::path& right) {
-  const std::string a = left.filename().string();
-  const std::string b = right.filename().string();
+// Natural-order comparison of two strings: numeric runs compare numerically so
+// that frame_2 sorts before frame_10. Plain lexicographic ordering is kept for
+// the non-numeric remainder, which gives a strict weak ordering for unique
+// names.
+bool naturalLessText(const std::string& a, const std::string& b) {
   size_t i = 0;
   size_t j = 0;
   while (i < a.size() && j < b.size()) {
@@ -207,25 +205,29 @@ class ImageSequenceSource final : public FrameSource {
       }
       return false;
     }
-    for (const auto& entry : fs::directory_iterator(directory, code)) {
-      if (code) {
-        break;
-      }
-      std::error_code entry_code;
-      if (!entry.is_regular_file(entry_code) || entry_code) {
-        continue;
-      }
-      if (isImageFile(entry.path())) {
-        files_.push_back(entry.path());
-      }
+    const fs::path root(directory);
+
+    // Prefer the flat layout (png/jpg files directly inside `directory`).
+    collectImages(root, /*recursive=*/false);
+    if (files_.empty()) {
+      // Fall back to the nested layout used by tools/synth_dataset.cpp:
+      //   <scenario>/frames/frame_00000.png (+ gt.csv / meta.yaml at the top).
+      collectImages(root, /*recursive=*/true);
     }
     if (files_.empty()) {
       if (error != nullptr) {
-        *error = "no png/jpg/bmp images found in: " + directory;
+        *error = "no png/jpg/bmp images found (searched recursively) in: " +
+                 directory;
       }
       return false;
     }
-    std::sort(files_.begin(), files_.end(), naturalLess);
+    // Natural order; for nested layouts compare the path relative to the
+    // sequence root so sub-directories sort deterministically as well.
+    std::sort(files_.begin(), files_.end(),
+              [&root](const fs::path& a, const fs::path& b) {
+                return naturalLessText(a.lexically_relative(root).generic_string(),
+                                       b.lexically_relative(root).generic_string());
+              });
     fps_ = (fps > 1e-6) ? fps : 30.0;
     return true;
   }
@@ -252,6 +254,37 @@ class ImageSequenceSource final : public FrameSource {
   double fps() const override { return fps_; }
 
  private:
+  void collectImages(const std::filesystem::path& root, bool recursive) {
+    namespace fs = std::filesystem;
+    std::error_code code;
+    if (recursive) {
+      fs::recursive_directory_iterator iterator(
+          root, fs::directory_options::skip_permission_denied, code);
+      const fs::recursive_directory_iterator end;
+      while (!code && iterator != end) {
+        std::error_code entry_code;
+        if (iterator->is_regular_file(entry_code) && !entry_code &&
+            isImageFile(iterator->path())) {
+          files_.push_back(iterator->path());
+        }
+        iterator.increment(code);
+      }
+      return;
+    }
+    for (const auto& entry : fs::directory_iterator(root, code)) {
+      if (code) {
+        break;
+      }
+      std::error_code entry_code;
+      if (!entry.is_regular_file(entry_code) || entry_code) {
+        continue;
+      }
+      if (isImageFile(entry.path())) {
+        files_.push_back(entry.path());
+      }
+    }
+  }
+
   std::vector<std::filesystem::path> files_;
   size_t index_ = 0;
   double fps_ = 30.0;

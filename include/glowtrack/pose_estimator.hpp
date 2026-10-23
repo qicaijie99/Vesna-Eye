@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 // PnP pose estimation from the detected white disc ellipse.
 //
 // The target's white disc is a circle of known physical radius R. Its image is
@@ -33,6 +33,15 @@ class PoseEstimator {
 
   // Estimates the target pose for one detection. Ambiguity resolution uses the
   // previously accepted pose as a continuity prior when available.
+  //
+  // Reported quality metrics:
+  //   PoseEstimate::reproj_rmse_px is the RMS first-order geometric distance
+  //   between the 48 projected model-circle points of the final pose and the
+  //   fitted disc ellipse. NOTE: for a circle of known radius every ellipse is
+  //   exactly realizable by a circle pose (up to the two-fold ambiguity), so a
+  //   converged refinement reports ~0; a clearly positive value means the
+  //   refinement failed and the raw IPPE solution is being used (still useful
+  //   as a failure detector, not as a detector-noise metric).
   PoseEstimate estimate(const Detection& detection);
 
   // Forget the temporal prior (call between independent sequences).

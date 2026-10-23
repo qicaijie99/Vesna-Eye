@@ -1,3 +1,5 @@
+%YAML:1.0
+---
 # ---------------------------------------------------------------------------
 # Deployment config: OpenMV Cam H7 Plus (OV5640) + 2.8 mm lens, QVGA 320x240.
 #
@@ -53,14 +55,14 @@ pose:
 
 kalman:
   process_noise_angle: 0.0004
-  process_noise_rate: 0.04
-  meas_sigma_deg: 0.8
+  process_noise_rate: 0.08
+  meas_sigma_deg: 0.7
   meas_sigma_scale_px: 25.0
   gate_chi2: 13.8
   max_prediction_frames: 15
   quality_decay_per_frame: 0.9
-  range_process_noise: 0.01
-  range_meas_sigma_m: 0.05
+  range_process_noise: 0.5
+  range_meas_sigma_m: 0.1
   latency_compensation_ms: 0.0
 
 tracker:
@@ -75,7 +77,7 @@ output:
   csv_path: results/openmv_track.csv
   overlay_enabled: false
   overlay_video_path: results/openmv_overlay.mp4
-  serial_enabled: true
+  serial_enabled: false  # enable with --serial COMx at runtime
   serial_port: COM3
   serial_baud: 115200
 

@@ -86,8 +86,9 @@ void printUsage() {
       "                  [--seed 42] [--noise sigma] [--blur px] [--fps 30]\n"
       "                  [--disc-mm 50] [--glow-mm 62] [--no-clutter] [--quiet]\n\n"
       "Scenarios:\n"
-      "  static_sweep  deterministic pose grid: yaw -25..25 deg, pitch -20..20,\n"
-      "                range 0.4..1.6 m, roll/tilt 0..40 deg, 3 frames per pose\n"
+      "  static_sweep  deterministic pose path through the envelope: yaw\n"
+      "                -25..25 deg, pitch -20..20 deg, range 0.4..1.6 m,\n"
+      "                roll/tilt 0..40 deg, 3 frames per pose\n"
       "  dynamic       smooth sinusoidal yaw/pitch/range/roll motion with three\n"
       "                detection dropouts (target not rendered) for filter tests\n"
       "  stress        small far target (disc ~10-20 px), heavy blur/noise, and\n"
@@ -326,19 +327,49 @@ void fillPolyAA(cv::Mat& img, const std::vector<cv::Point2f>& pts,
   if (pts.size() < 3) {
     return;
   }
-  std::vector<std::vector<cv::Point2f>> polys{pts};
+  std::vector<cv::Point> int_pts;
+  int_pts.reserve(pts.size());
+  for (const auto& p : pts) {
+    int_pts.emplace_back(cvRound(p.x), cvRound(p.y));
+  }
+  std::vector<std::vector<cv::Point>> polys{int_pts};
   cv::fillPoly(img, polys, color, cv::LINE_AA);
 }
 
-// Chamfered rectangle in the target plane (the white plastic bracket).
-std::vector<cv::Point2d> bracketPolygon(double w, double h) {
-  const double ch = std::min(w, h) * 0.12;
-  const double x = w * 0.5;
-  const double y = h * 0.5;
-  return {
-      {-x + ch, -y}, {x - ch, -y}, {x, -y + ch}, {x, y - ch},
-      {x - ch, y},   {-x + ch, y}, {-x, y - ch}, {-x, -y + ch},
-  };
+void polylineAA(cv::Mat& img, const std::vector<cv::Point2f>& pts,
+                const cv::Scalar& color, int thickness) {
+  if (pts.size() < 2) {
+    return;
+  }
+  std::vector<cv::Point> int_pts;
+  int_pts.reserve(pts.size());
+  for (const auto& p : pts) {
+    int_pts.emplace_back(cvRound(p.x), cvRound(p.y));
+  }
+  std::vector<std::vector<cv::Point>> polys{int_pts};
+  cv::polylines(img, polys, true, color, thickness, cv::LINE_AA);
+}
+
+// White 3D-printed V-bracket behind the green diffuser (target plane [mm],
+// x right / y up). Two wings extend up-left / up-right; a support stem drops
+// down. Like the real target, the bracket is *outside* the diffuser so it does
+// not create a bright ring around the white disc.
+std::vector<std::vector<cv::Point2d>> bracketWings(double glow_radius_mm) {
+  const double g = glow_radius_mm;
+  std::vector<std::vector<cv::Point2d>> wings;
+  wings.push_back({{-0.55 * g, 0.55 * g},
+                   {-2.90 * g, 2.35 * g},
+                   {-3.35 * g, 1.55 * g},
+                   {-1.05 * g, 0.05 * g}});
+  wings.push_back({{0.55 * g, 0.55 * g},
+                   {2.90 * g, 2.35 * g},
+                   {3.35 * g, 1.55 * g},
+                   {1.05 * g, 0.05 * g}});
+  wings.push_back({{-0.45 * g, -0.55 * g},
+                   {0.45 * g, -0.55 * g},
+                   {0.70 * g, -2.60 * g},
+                   {-0.70 * g, -2.60 * g}});
+  return wings;
 }
 
 // V-shaped green diffuser wings (target plane [mm], x right / y up).
@@ -358,20 +389,33 @@ std::vector<std::vector<cv::Point2d>> diffuserWings(double glow_radius_mm) {
   return wings;
 }
 
+// Large green translucent diffuser plate behind the bright glow ring (the real
+// target is a V-shaped green plastic diffuser that extends beyond the white
+// disc; the detector validates a green annulus out to ~1.45 x disc radius).
+std::vector<cv::Point2d> diffuserPlate(double disc_radius_mm) {
+  std::vector<cv::Point2d> pts;
+  const int samples = 72;
+  for (int i = 0; i < samples; ++i) {
+    const double a = 2.0 * kPi * i / samples;
+    pts.emplace_back(1.58 * disc_radius_mm * std::cos(a),
+                     1.34 * disc_radius_mm * std::sin(a));
+  }
+  return pts;
+}
+
 void drawTarget(cv::Mat& frame, const Camera& cam, const Pose3D& pose,
                 double disc_radius_mm, double glow_radius_mm) {
   const double disc_r = disc_radius_mm;
   const double glow_r = std::max(glow_radius_mm, disc_r * 1.05);
 
-  // 1) Light-grey 3D-printed bracket plate behind the glow (kept below the
-  //    detector's white-disc threshold on purpose: only the disc is saturated).
-  const auto plate =
-      projectPlanarPolygon(pose, cam, bracketPolygon(2.75 * disc_r, 2.25 * disc_r));
-  fillPolyAA(frame, plate, cv::Scalar(186, 189, 192));
-  // A slightly brighter rim makes the plate read as a separate 3D object.
-  if (!plate.empty()) {
-    std::vector<std::vector<cv::Point2f>> polys{plate};
-    cv::polylines(frame, polys, true, cv::Scalar(160, 163, 166), 2, cv::LINE_AA);
+  // 1) Light-grey 3D-printed V-bracket wings behind the diffuser (kept below
+  //    the detector's white-disc threshold on purpose: only the disc is
+  //    saturated; the white plastic reads as light grey under this exposure).
+  const auto bracket = bracketWings(glow_r);
+  for (const auto& wing_mm : bracket) {
+    const auto wing = projectPlanarPolygon(pose, cam, wing_mm);
+    fillPolyAA(frame, wing, cv::Scalar(174, 177, 180));
+    polylineAA(frame, wing, cv::Scalar(150, 153, 156), 2);
   }
 
   // 2) Green glow layer: the diffuser wings + the glowing annulus disc. This
@@ -382,6 +426,8 @@ void drawTarget(cv::Mat& frame, const Camera& cam, const Pose3D& pose,
     const auto wing = projectPlanarPolygon(pose, cam, wing_mm);
     fillPolyAA(glow_layer, wing, cv::Scalar(35, 165, 55));
   }
+  fillPolyAA(glow_layer, projectPlanarPolygon(pose, cam, diffuserPlate(disc_r)),
+             cv::Scalar(30, 150, 45));
   const auto glow_circle = projectCircle(pose, cam, glow_r, 96);
   fillPolyAA(glow_layer, glow_circle, cv::Scalar(30, 215, 55));
 
@@ -402,6 +448,8 @@ void drawTarget(cv::Mat& frame, const Camera& cam, const Pose3D& pose,
     const auto wing = projectPlanarPolygon(pose, cam, wing_mm);
     fillPolyAA(frame, wing, cv::Scalar(30, 180, 45));
   }
+  fillPolyAA(frame, projectPlanarPolygon(pose, cam, diffuserPlate(disc_r)),
+             cv::Scalar(28, 155, 42));
   const auto glow_sharp = projectCircle(pose, cam, glow_r, 96);
   fillPolyAA(frame, glow_sharp, cv::Scalar(25, 225, 40));
   const auto ring = projectCircle(pose, cam, disc_r * 1.13, 96);
@@ -564,31 +612,80 @@ double defaultNoise(const std::string& scenario) {
   if (scenario == "dynamic") return 3.0;
   return 12.0;
 }
+// static_sweep: deterministic continuous pose path through the whole working
+// envelope (3 frames per path node, linearly interpolated between nodes so the
+// Kalman filter sees a realistic smooth motion instead of teleporting poses):
+//   segment A - yaw sweep -25..25 deg at pitch 0, range 0.8 m
+//   segment B - pitch sweep -20..20 deg at yaw 12 deg, range 0.4..1.6 m
+//   segment C - roll/tilt sweep 0..40 deg at yaw = pitch = 0, range 0.8 m
+Pose staticSweepPose(int frame, int total_frames) {
+  const int poses = std::max(4, total_frames / 3);
+  const double pos =
+      std::min(static_cast<double>(frame) / 3.0, static_cast<double>(poses - 1));
+  const int n_t = std::max(2, std::min(6, poses / 10));
+  int n_a = std::max(4, static_cast<int>(std::lround(0.40 * poses)));
+  int n_b = std::max(4, static_cast<int>(std::lround(0.30 * poses)));
+  if (n_a + n_b + 2 * n_t >= poses) {
+    n_a = std::max(2, poses / 4);
+    n_b = std::max(2, poses / 4);
+  }
+  const double p1 = n_a - 1.0;                  // end of segment A
+  const double p2 = p1 + n_t;                   // start of segment B
+  const double p3 = p2 + n_b - 1.0;             // end of segment B
+  const double p4 = p3 + n_t;                   // start of segment C
+  const double p5 = std::max(p4 + 1.0, static_cast<double>(poses - 1));
 
-// static_sweep: deterministic grid of 300 poses (yaw x pitch x range x
-// roll/tilt), sampled with a stride so that a short sequence already covers the
-// whole working envelope; 3 consecutive frames per pose.
-Pose staticSweepPose(int frame) {
-  static const double yaw_levels[5] = {-25.0, -15.0, 0.0, 15.0, 25.0};
-  static const double pitch_levels[3] = {-20.0, 0.0, 20.0};
-  static const double dist_levels[4] = {0.4, 0.8, 1.2, 1.6};
-  static const double combos[5][2] = {
-      {0.0, 0.0}, {20.0, 20.0}, {40.0, 40.0}, {0.0, 40.0}, {40.0, 0.0}};
-  const int pose_index = frame / 3;
-  const int idx = (pose_index * 137) % 300;  // 137 coprime with 300
-  const int ci = idx % 5;
-  int t = idx / 5;
-  const int di = t % 4;
-  t /= 4;
-  const int pi = t % 3;
-  const int yi = (t / 3) % 5;
-  Pose p;
-  p.yaw_deg = yaw_levels[yi];
-  p.pitch_deg = pitch_levels[pi];
-  p.distance_m = dist_levels[di];
-  p.roll_deg = combos[ci][0];
-  p.tilt_deg = combos[ci][1];
-  return p;
+  const Pose a_start{-25.0, 0.0, 0.8, 0.0, 0.0};
+  const Pose a_end{25.0, 0.0, 0.8, 0.0, 0.0};
+  const Pose b_start{12.0, -20.0, 0.4, 0.0, 0.0};
+  const Pose b_end{12.0, 20.0, 1.6, 0.0, 0.0};
+  const Pose c_start{0.0, 0.0, 0.8, 0.0, 0.0};
+  auto lerp = [](const Pose& a, const Pose& b, double u) {
+    Pose r;
+    r.yaw_deg = a.yaw_deg + (b.yaw_deg - a.yaw_deg) * u;
+    r.pitch_deg = a.pitch_deg + (b.pitch_deg - a.pitch_deg) * u;
+    r.distance_m = a.distance_m + (b.distance_m - a.distance_m) * u;
+    r.roll_deg = a.roll_deg + (b.roll_deg - a.roll_deg) * u;
+    r.tilt_deg = a.tilt_deg + (b.tilt_deg - a.tilt_deg) * u;
+    return r;
+  };
+  // Eased profiles: cosine sweeps for the three segments (zero velocity at the
+  // segment ends) and smoothstep transitions, so the motion is continuous in
+  // velocity and the Kalman filter is not punished by teleporting poses.
+  auto smoothstep = [](double u) { return u * u * (3.0 - 2.0 * u); };
+  auto cosine01 = [](double u) { return 0.5 - 0.5 * std::cos(kPi * u); };
+  if (pos <= p1) {
+    const double u = p1 > 1e-9 ? pos / p1 : 0.0;
+    Pose pose;
+    pose.yaw_deg = -25.0 + 50.0 * cosine01(u);
+    pose.pitch_deg = 0.0;
+    pose.distance_m = 0.8;
+    return pose;
+  }
+  if (pos <= p2) {
+    const double u = smoothstep((pos - p1) / (p2 - p1));
+    return lerp(a_end, b_start, u);
+  }
+  if (pos <= p3) {
+    const double u = (pos - p2) / (p3 - p2);
+    const double e = cosine01(u);
+    Pose pose;
+    pose.yaw_deg = b_start.yaw_deg;
+    pose.pitch_deg =
+        b_start.pitch_deg + (b_end.pitch_deg - b_start.pitch_deg) * e;
+    pose.distance_m =
+        b_start.distance_m + (b_end.distance_m - b_start.distance_m) * e;
+    return pose;
+  }
+  if (pos <= p4) {
+    const double u = smoothstep((pos - p3) / (p4 - p3));
+    return lerp(b_end, c_start, u);
+  }
+  const double u = (pos - p4) / std::max(1e-9, p5 - p4);
+  Pose pose = c_start;
+  pose.roll_deg = 40.0 * cosine01(u);
+  pose.tilt_deg = 40.0 * cosine01(u);
+  return pose;
 }
 
 Pose dynamicPose(int frame, double fps) {
@@ -694,16 +791,32 @@ void writeMeta(const Options& opt, const Camera& cam, int frames,
   fs << "cy" << cam.cy;
   fs << "seed" << opt.seed;
   fs << "noise_sigma" << opt.noise;
-  fs << "motion_blur_px" << (opt.blur >= 0.0 ? opt.blur : -1.0)
-     << "  # -1 = scenario default (dynamic: 0.5 * image displacement)";
+  fs << "motion_blur_px" << (opt.blur >= 0.0 ? opt.blur : -1.0);
   fs << "disc_diameter_mm" << opt.disc_mm;
   fs << "glow_outer_diameter_mm" << opt.glow_mm;
   fs << "clutter" << (opt.clutter ? 1 : 0);
   fs << "dropouts" << intervalsToString(dropouts);
   fs << "occlusions" << intervalsToString(occlusions);
-  fs << "notes"
-     << "Generated by glowtrack_synth; ground-truth angles follow "
-        "include/glowtrack/types.hpp conventions.";
+  std::string notes;
+  if (opt.scenario == "static_sweep") {
+    notes =
+        "Deterministic pose path, 3 frames per pose: yaw sweep -25..25 deg, "
+        "pitch sweep -20..20 deg with range 0.4..1.6 m, roll/tilt sweep "
+        "0..40 deg.";
+  } else if (opt.scenario == "dynamic") {
+    notes =
+        "Sinusoidal yaw/pitch/range/roll motion; dropouts = frames where the "
+        "target is not rendered (visible=0) so the filter must predict.";
+  } else {
+    notes =
+        "Small far target (disc ~10-20 px), heavy motion blur/noise, partial "
+        "occlusion by a dark rectangle.";
+  }
+  notes +=
+      " Ground-truth angles follow include/glowtrack/types.hpp conventions; "
+      "disc_cx/disc_cy/disc_radius_px are the ideal fitEllipse of the rendered "
+      "white disc.";
+  fs << "notes" << notes;
   fs.release();
 }
 
@@ -794,7 +907,7 @@ int run(const Options& opt_in) {
 
     Pose pose;
     if (opt.scenario == "static_sweep") {
-      pose = staticSweepPose(frame);
+      pose = staticSweepPose(frame, opt.frames);
     } else if (opt.scenario == "dynamic") {
       pose = dynamicPose(frame, opt.fps);
     } else {

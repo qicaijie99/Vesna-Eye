@@ -8,6 +8,9 @@
 - `recon/`
   - 开发前侦察产物：宽阈值绿色掩膜逐帧统计 CSV、原始帧与目标放大图。
   - 结论见 `docs/recon_target_analysis.md`。
+- `../results/qvga/`（运行时生成，已被 .gitignore 忽略）
+  - 由两个原始视频转制的 QVGA 320x240 部署分辨率模拟视频（旋转 90° → 320x180 → letterbox），
+    用于验证 OpenMV 相机分辨率下的检测/PnP/滤波（见 `docs/validation_report.md` §5）。
 - `synthetic/`（运行时生成，已被 .gitignore 忽略）
   - `glowtrack_synth` 生成的合成图像序列与真值 CSV。
 - `calibration/`（运行时生成）

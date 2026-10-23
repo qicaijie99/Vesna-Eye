@@ -1,3 +1,5 @@
+%YAML:1.0
+---
 # ---------------------------------------------------------------------------
 # Validation config for the two supplied phone videos (720x1280 portrait, 30 fps).
 #
@@ -54,15 +56,15 @@ pose:
   ambiguity_cost_margin: 0.10
 
 kalman:
-  process_noise_angle: 0.0002
-  process_noise_rate: 0.02
-  meas_sigma_deg: 0.6
+  process_noise_angle: 0.0004
+  process_noise_rate: 0.08
+  meas_sigma_deg: 0.35
   meas_sigma_scale_px: 40.0
   gate_chi2: 13.8
   max_prediction_frames: 15
   quality_decay_per_frame: 0.9
-  range_process_noise: 0.01
-  range_meas_sigma_m: 0.05
+  range_process_noise: 0.5
+  range_meas_sigma_m: 0.1
   latency_compensation_ms: 0.0
 
 tracker:

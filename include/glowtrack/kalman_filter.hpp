@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 // Kalman filters used by the tracker.
 //
 // AngleKalmanFilter
@@ -33,8 +33,14 @@ class AngleKalmanFilter {
   void predict(double dt);
 
   // Measurement update. Returns false if the measurement was rejected by the
-  // innovation gate (or the filter is not initialized).
+  // innovation gate (or the filter is not initialized). A non-positive
+  // meas_sigma_rad selects the configured nominal measurement noise.
   bool update(double yaw, double pitch, double meas_sigma_rad);
+
+  // Measurement 1-sigma [rad] for a disc whose fitted ellipse has the given
+  // mean radius in pixels: the configured base noise (meas_sigma_deg) is
+  // scaled up for small (far) targets by meas_sigma_scale_px / radius.
+  double measurementSigmaRad(double mean_radius_px) const;
 
   bool initialized() const { return initialized_; }
 
@@ -57,6 +63,10 @@ class AngleKalmanFilter {
   cv::Matx44d P_ = cv::Matx44d::eye();  // state covariance
   cv::Vec4d x_{0, 0, 0, 0};             // yaw, pitch, yaw_rate, pitch_rate
   bool initialized_ = false;
+  // Innovation-adaptive process-noise boost used for maneuver handling: large
+  // (but still accepted) innovations inflate the process noise of the next
+  // predict steps and then decay back to 1.
+  double maneuver_scale_ = 1.0;
 };
 
 class RangeKalmanFilter {

@@ -1,4 +1,4 @@
-# End-to-end validation on the two supplied real videos (no ground truth).
+﻿# End-to-end validation on the two supplied real videos (no ground truth).
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run_validation.ps1
 #
@@ -9,12 +9,14 @@
 # and copies a few overlay sample frames into docs/validation/assets/.
 param(
     [string]$Config = "config\video_720p_phone.yaml",
+    [string]$BuildDir = "build",
     [switch]$SkipBuild,
     [switch]$SkipOverlay
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+$bin = Join-Path $root (Join-Path $BuildDir "Release")
 
 $out = Join-Path $root "results\real_validation"
 New-Item -ItemType Directory -Force -Path $out | Out-Null
@@ -22,7 +24,7 @@ $assets = Join-Path $root "docs\validation\assets"
 New-Item -ItemType Directory -Force -Path $assets | Out-Null
 
 if (-not $SkipBuild) {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build.ps1") -Targets @("glowtrack", "glowtrack_eval")
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build.ps1") -BuildDir $BuildDir -Targets @("glowtrack", "glowtrack_eval")
 }
 
 $videos = @(
@@ -44,11 +46,11 @@ foreach ($video in $videos) {
         "--quiet"
     )
     if (-not $SkipOverlay) { $glowArgs += @("--overlay", $overlay) }
-    & (Join-Path $root "build\Release\glowtrack.exe") @glowArgs
+    & (Join-Path $bin "glowtrack.exe") @glowArgs
     if ($LASTEXITCODE -ne 0) { throw "tracking failed for $name" }
 
     Write-Host "--- eval $name ---"
-    & (Join-Path $root "build\Release\glowtrack_eval.exe") `
+    & (Join-Path $bin "glowtrack_eval.exe") `
         --track $trackCsv --config $Config --out (Join-Path $out "eval_$name") --label $name
     if ($LASTEXITCODE -ne 0) { throw "evaluation failed for $name" }
 

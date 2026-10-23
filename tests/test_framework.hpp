@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 // Minimal dependency-free unit-test framework (no gtest required).
 //
 // Usage:
@@ -128,3 +128,9 @@ inline int runAll() {
           ":" + std::to_string(__LINE__) + ")"};                          \
     }                                                                     \
   } while (0)
+
+// Convenience aliases used by module tests.
+#define GT_CHECK_TRUE(cond) GT_CHECK(cond)
+#define GT_CHECK_FALSE(cond) GT_CHECK(!(cond))
+#define GT_CHECK_EQ_INT(a, b) GT_CHECK_NEAR(a, b, 0.0)
+#define GT_CHECK_GE(a, b) GT_CHECK_LE(b, a)

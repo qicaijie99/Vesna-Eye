@@ -49,8 +49,8 @@ cv::Point2f projectLos(const CameraIntrinsics& camera, double yaw,
   const double z = 1.0;
   const double x = std::tan(yaw);
   const double y = -std::tan(pitch);
-  std::vector<cv::Point3d> object_points{3};
-  object_points[0] = cv::Point3d(x, y, z);
+  std::vector<cv::Point3d> object_points;
+  object_points.emplace_back(x, y, z);
   std::vector<cv::Point2d> image_points;
   cv::projectPoints(object_points, cv::Vec3d(0, 0, 0), cv::Vec3d(0, 0, 0),
                     camera.cameraMatrix(), camera.distortion(), image_points);
@@ -187,8 +187,13 @@ void drawHud(cv::Mat& canvas, const RuntimeConfig& config,
 // ===========================================================================
 // CsvLogger
 // ===========================================================================
-struct CsvLoggerImplLink {};
-// (Impl is defined in the anonymous namespace above; definitions follow.)
+struct CsvLogger::Impl {
+  std::string path;
+  std::string error;
+  bool ok = false;
+  bool header_written = false;
+  FILE* file = nullptr;
+};
 
 CsvLogger::CsvLogger(const std::string& path) : impl_(new Impl()) {
   impl_->path = path;
@@ -224,6 +229,7 @@ void CsvLogger::writeHeader() {
       "yaw_deg,pitch_deg,yaw_rate_dps,pitch_rate_dps,distance_m,"
       "quality,reproj_rmse_px,track_id,raw_yaw_deg,raw_pitch_deg,"
       "ellipse_cx,ellipse_cy,semi_major,semi_minor,ellipse_angle_deg\n");
+  std::fflush(impl_->file);
   impl_->header_written = true;
 }
 
@@ -251,6 +257,7 @@ void CsvLogger::log(const TrackOutput& output, const Detection& detection,
                detection.valid ? detection.disc_ellipse.semi_major : 0.0,
                detection.valid ? detection.disc_ellipse.semi_minor : 0.0,
                detection.valid ? detection.disc_ellipse.angle_deg : 0.0);
+  std::fflush(impl_->file);  // keep the log readable by external tools/scripts
 }
 
 // ===========================================================================

@@ -35,7 +35,7 @@ void printUsage() {
       "  glowtrack --config <yaml> --video  <file>  [options]\n"
       "  glowtrack --config <yaml> --images <dir>   [--fps 30] [options]\n"
       "  glowtrack --config <yaml> --camera <index> [options]\n"
-      "  glowtrack --config <yaml> --openmv <COMx>  [--baud 921600] [options]\n"
+      "  glowtrack --config <yaml> --openmv <COMx>  [--cam-baud 3000000] [options]\n"
       "  glowtrack --mode calibrate --images <dir> --cols 9 --rows 6 \\\n"
       "            --square-mm 25 --out calib.yaml [--debug-dir <dir>]\n\n"
       "Tracking options:\n"
@@ -45,7 +45,8 @@ void printUsage() {
       "  --no-csv          disable CSV logging\n"
       "  --overlay <path>  write annotated mp4 video    (overrides config)\n"
       "  --serial <port>   stream TrackPacket to the lower computer\n"
-      "  --baud <rate>     serial baud rate (default from config)\n"
+      "  --baud <rate>     lower-computer serial baud rate (default from config)\n"
+      "  --cam-baud <rate> OpenMV image-stream baud rate (default: --baud)\n"
       "  --latency-ms <ms> control latency compensation (overrides config)\n"
       "  --print-every N   progress line every N frames (default 30, 0 = off)\n"
       "  --quiet           only print the final summary\n"
@@ -74,6 +75,7 @@ struct Args {
   std::string out;
   std::string debug_dir;
   int baud = 0;
+  int cam_baud = 0;
   int cols = 9;
   int rows = 6;
   double square_mm = 25.0;
@@ -141,6 +143,10 @@ bool parseArgs(int argc, char** argv, Args* args) {
       std::string v;
       if (!needStr(&v)) return false;
       args->baud = std::atoi(v.c_str());
+    } else if (arg == "--cam-baud") {
+      std::string v;
+      if (!needStr(&v)) return false;
+      args->cam_baud = std::atoi(v.c_str());
     } else if (arg == "--cols") {
       std::string v;
       if (!needStr(&v)) return false;
@@ -354,6 +360,9 @@ int runTracking(const Args& args) {
   FrameSourceConfig source_config = makeSourceConfig(args);
   source_config.fps = args.fps > 0.0 ? args.fps : config.nominal_fps;
   source_config.serial_baud = config.output.serial_baud;
+  if (args.cam_baud > 0) {
+    source_config.serial_baud = args.cam_baud;
+  }
 
   std::string error;
   auto source = FrameSource::create(source_config, &error);

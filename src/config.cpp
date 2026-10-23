@@ -248,6 +248,14 @@ void applyCameraCalibrationFile(const std::string& config_path,
 RuntimeConfig loadRuntimeConfig(const std::string& path) {
   RuntimeConfig config;
 
+  {
+    std::error_code code;
+    if (!std::filesystem::is_regular_file(path, code)) {
+      throw std::runtime_error("cannot open config file '" + path +
+                               "': file not found");
+    }
+  }
+
   cv::FileStorage storage;
   bool opened = false;
   try {

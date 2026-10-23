@@ -16,6 +16,7 @@
 #include <opencv2/core.hpp>
 
 #include <memory>
+#include <vector>
 
 namespace glowtrack {
 
@@ -42,8 +43,36 @@ class TargetDetector {
   void reset();
 
   // Debug views (valid after detect()):
+  //   debugMask()       : BGR view of the segmentation (green = green mask,
+  //                       white = saturated-white mask, blue rect = processed
+  //                       ROI). Empty when the last input image was invalid.
+  //   debugCandidates() : copy of the input image with every evaluated
+  //                       candidate drawn (blue = accepted, orange = rejected,
+  //                       red = winning candidate).
   const cv::Mat& debugMask() const;
   const cv::Mat& debugCandidates() const;
+
+  // Detailed candidate list of the last detect() (full-image coordinates).
+  // Additive tuning helper, does not affect the tracking pipeline.
+  struct CandidateInfo {
+    Ellipse2D disc;
+    float score = 0.f;
+    bool accepted = false;
+    bool from_hole = false;
+    float ring_ratio = 0.f;
+    float white_frac = 0.f;
+    float core_frac = 0.f;  // overexposed (blown-out) white fraction
+    float fill_ratio = 0.f; // contour area / fitted ellipse area
+    float mean_v = 0.f;
+    float mean_s = 0.f;
+    float glow_area = 0.f;
+  };
+  const std::vector<CandidateInfo>& debugCandidateInfo() const;
+
+  // Debug image construction can be disabled for production / timing runs
+  // (it costs ~0.5-1 ms per large frame). Default: enabled.
+  void setDebugEnabled(bool enabled);
+  bool debugEnabled() const;
 
   struct Impl;  // pimpl keeps the public interface stable while tuning
 

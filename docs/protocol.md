@@ -100,6 +100,9 @@ float pitch = (int16_t)(pkt.pitch_q) * 1e-4f;   /* rad */
 | UART | 320x240，JPEG quality 50–60，UART 3 Mbaud（约 300 KB/s）→ 约 15–20 fps；6 Mbaud 更快 |
 | UART 接线 | OpenMV UART3：P4=TX、P5=RX（以所用板卡引脚图为准），交叉接 USB-TTL 的 RX/TX，共地 |
 
+上位机命令行里图像流与下位机输出的波特率可分别设置：`--cam-baud <rate>`（OpenMV 图像流，
+默认取 `--baud`）与 `--baud <rate>`（下位机跟踪结果）。
+
 **带宽估算**：每帧字节数 ≈ `jpeg_len + 15`。30 fps × 15 KB ≈ 450 KB/s，
 UART 需要 ≥ 4.5 Mbaud（8N1 有效 10 bit/byte），因此高速场景优先 USB CDC。
 

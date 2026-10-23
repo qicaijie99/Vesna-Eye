@@ -2,6 +2,7 @@
 #
 #   powershell -ExecutionPolicy Bypass -File scripts/build.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts/build.ps1 -Targets glowtrack_tests
+#   powershell -ExecutionPolicy Bypass -File scripts/build.ps1 -Targets glowtrack,glowtrack_tests
 #
 # Every teammate/validation run can use its own build directory to avoid clashing
 # with parallel builds:  -BuildDir build_detector
@@ -16,6 +17,27 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($BuildDir)) { $BuildDir = Join-Path $root "build" }
+
+# Robust parameter handling for `powershell -File`:
+#   - `-Targets a,b`      -> array (works)
+#   - `-Targets a b`      -> the 2nd token leaks into the next positional
+#                            parameter ($Config or $OpenCVDir). Detect a value
+#                            that cannot be that parameter and treat it as a
+#                            target instead.
+$validConfigs = @("Debug", "Release", "RelWithDebInfo", "MinSizeRel")
+$extraTargets = @()
+if ($validConfigs -notcontains $Config) {
+    $extraTargets += $Config
+    $Config = "Release"
+}
+if (-not [string]::IsNullOrWhiteSpace($OpenCVDir) -and
+    -not (Test-Path (Join-Path $OpenCVDir "OpenCVConfig.cmake"))) {
+    $extraTargets += $OpenCVDir
+    $OpenCVDir = ""
+}
+$Targets = @(@($Targets) + $extraTargets |
+    ForEach-Object { if ($_ -is [string]) { $_ -split ',' } else { $_ } } |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
 # Locate the prebuilt OpenCV (VC16 folder with OpenCVConfig.cmake).
 if ([string]::IsNullOrWhiteSpace($OpenCVDir)) {

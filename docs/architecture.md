@@ -131,6 +131,12 @@ cv::solvePnPGeneric(obj_pts, img_pts, K, D, rvecs, tvecs, false, cv::SOLVEPNP_IP
 
 最终 `reproj_rmse_px` 由投影圆点到拟合椭圆的几何距离统计得到。
 
+> **注意（交付版本实测）**：对已知半径的圆，任意图像椭圆都恰好是某个圆位姿的投影
+> （背投影锥的两个圆截面解），因此精化后的模型圆重投影残差在数学上必然 ≈ 0。
+> `reproj_rmse_px` 在实现中保留为"精化失败/回退"的检测量（`refine_iterations=0` 时非零，
+> 单元测试覆盖），**不能**作为检测噪声或精度指标。视角精度请用合成真值误差与
+> "PnP 视线角 vs 椭圆中心视线角"交叉校验（见 `docs/validation_report.md` §7）。
+
 ### 5.4 输出
 
 由 `t = tvec`（目标中心在相机系，单位 mm）计算 yaw / pitch / distance。
@@ -155,12 +161,21 @@ R = diag(σ_yaw², σ_pitch²),  σ = meas_sigma_deg · clamp(meas_sigma_scale_p
 - **卡方门限**：`ν^T S^{-1} ν > gate_chi2` 时判为野值，跳过量测（继续预测）；
 - **质量因子**：由协方差映射到 `quality ∈ [0,1]`，丢帧时按 `quality_decay_per_frame` 衰减；
 - **延时补偿**：输出前用 `predictAhead(latency_compensation_ms)` 外推到"当前真实时刻"，
-  抵消相机曝光 + 传输 + 处理延时。
+  抵消相机曝光 + 传输 + 处理延时；
+- **机动自适应 Q**：被接受的量测若接近卡方门限（大机动），下一步 predict 的过程噪声最多放大
+  7 倍并逐帧衰减，使滤波器在目标快速反转时快速收敛、稳态时保持平滑；
+- 交付默认参数（30 fps 场景，见 `config/*.yaml`）：`process_noise_angle=4e-4`、
+  `process_noise_rate=0.08`、`meas_sigma_deg=0.35`（720p）/`0.7`（QVGA，按表观半径缩放）、
+  `gate_chi2=13.8`。参数由真实视频 + 合成数据联合调优（滤波后误差 vs 抖动/滞后权衡）。
 
 ### 6.2 距离滤波器（2 状态）
 
 状态 `[range, range_rate]`，量测为 PnP 距离。距离输出不参与姿态控制时精度要求较低，
-主要用于安全距离/丢失判定与日志。
+主要用于安全距离/丢失判定、ROI 尺寸预测与日志。
+
+交付默认 `range_process_noise=0.5`、`range_meas_sigma_m=0.1`。初版参数（0.01/0.05）在距离
+快速变化时滤波会因卡方门限持续拒绝量测而发散（合成 static_sweep 距离误差 66.9 %）；
+调大过程噪声后降为 **5.4–6.7 %**（见 `docs/validation_report.md` §8）。
 
 ## 7. 跟踪状态机
 
@@ -174,7 +189,8 @@ R = diag(σ_yaw², σ_pitch²),  σ = meas_sigma_deg · clamp(meas_sigma_scale_p
         └──────────────────────────────────────────────────────────────┘
 ```
 
-- `SEARCH`：每 `full_search_interval` 帧做一次全图检测；
+- `SEARCH`/`IDLE`：每帧做一次全图检测（720p 全图检测约 2–3.6 ms，预算内，可最快捕获目标）；
+  `full_search_interval` 只用于**限制 LOST 状态的重捕频率**；
 - `ACQUIRE`：连续 `acquire_hits` 帧有效检测才进入 `TRACK`（抑制误检）；
 - `TRACK`：ROI 检测 + 滤波更新，输出 measured=true；
 - `PREDICT`：无检测时滤波外推，`predicted=true`，`quality` 衰减，输出仍 valid；
@@ -208,8 +224,11 @@ R = diag(σ_yaw², σ_pitch²),  σ = meas_sigma_deg · clamp(meas_sigma_scale_p
 
 ## 10. 性能目标与验证
 
-- 检测+解算+滤波单帧耗时目标：720p ≲ 10 ms（32 核 i7 单线程 OpenCV），
-  QVGA ≲ 4 ms，满足 30–100 fps 实时输出。
+- 实测（VS2019 Release，单线程 OpenCV，i7 级 CPU）：
+  - 720p 端到端（检测+PnP+滤波）：**1.76–2.00 ms/帧**；检测器全图 2.4 ms（debug 关）/3.6 ms（debug 开），
+    ROI 模式 0.63–0.70 ms；
+  - QVGA（320x240）端到端：**0.43–0.44 ms/帧**；
+  - 30 fps 预算 33 ms ⇒ 720p 占用约 6 %、QVGA 约 1.3 %，实时余量充足。
 - 精度验证：
   - 合成数据（已知真值）：yaw/pitch 误差、距离误差、滤波抖动降低、丢帧外推误差；
   - 真实视频（无真值）：检测率/连续性、PnP 重投影误差、PnP 视线角与椭圆中心视线角交叉一致性、
@@ -221,6 +240,9 @@ R = diag(σ_yaw², σ_pitch²),  σ = meas_sigma_deg · clamp(meas_sigma_scale_p
 - OpenMV 只作为相机 + 图像传输端：`openmv/openmv_cam_stream.py` 采集 QVGA RGB565、
   JPEG 压缩后按 `docs/protocol.md` 的帧格式通过 UART/USB 发给上位机；
 - 上位机 `FrameSource`（`OpenMvSerial` 类型）解帧、`cv::imdecode` 得到 BGR 帧；
+- 图像流波特率与下位机输出波特率可分别设置：`--cam-baud`（图像流，默认取 `--baud`）与 `--baud`；
+- 已用 720p→320x240 QVGA 模拟验证部署分辨率：检测率 97.8–100 %、抖动比 0.30–0.69、
+  0.44 ms/帧（见验证报告 §5）；
 - 相机内参用 `--mode calibrate` 标定后写入配置（或用 OpenMV 默认内参，见 `docs/calibration.md`）。
 - 历史 OpenMV MicroPython 脚本（`F:\github_hub\视觉代码\...\main_final.py`）只输出 blob 像素坐标，
   本模块是其上位机升级替代。

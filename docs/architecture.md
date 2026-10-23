@@ -225,9 +225,9 @@ R = diag(σ_yaw², σ_pitch²),  σ = meas_sigma_deg · clamp(meas_sigma_scale_p
 ## 10. 性能目标与验证
 
 - 实测（VS2019 Release，单线程 OpenCV，i7 级 CPU）：
-  - 720p 端到端（检测+PnP+滤波）：**1.76–2.00 ms/帧**；检测器全图 2.4 ms（debug 关）/3.6 ms（debug 开），
+  - 720p 端到端（检测+PnP+滤波）：**≈1.8–2.0 ms/帧**；检测器全图 2.4 ms（debug 关）/3.6 ms（debug 开），
     ROI 模式 0.63–0.70 ms；
-  - QVGA（320x240）端到端：**0.43–0.44 ms/帧**；
+  - QVGA（320x240）端到端：**≈0.40–0.47 ms/帧**；
   - 30 fps 预算 33 ms ⇒ 720p 占用约 6 %、QVGA 约 1.3 %，实时余量充足。
 - 精度验证：
   - 合成数据（已知真值）：yaw/pitch 误差、距离误差、滤波抖动降低、丢帧外推误差；
@@ -242,7 +242,7 @@ R = diag(σ_yaw², σ_pitch²),  σ = meas_sigma_deg · clamp(meas_sigma_scale_p
 - 上位机 `FrameSource`（`OpenMvSerial` 类型）解帧、`cv::imdecode` 得到 BGR 帧；
 - 图像流波特率与下位机输出波特率可分别设置：`--cam-baud`（图像流，默认取 `--baud`）与 `--baud`；
 - 已用 720p→320x240 QVGA 模拟验证部署分辨率：检测率 97.8–100 %、抖动比 0.30–0.69、
-  0.44 ms/帧（见验证报告 §5）；
+  ≈0.4 ms/帧（见验证报告 §5）；
 - 相机内参用 `--mode calibrate` 标定后写入配置（或用 OpenMV 默认内参，见 `docs/calibration.md`）。
 - 历史 OpenMV MicroPython 脚本（`F:\github_hub\视觉代码\...\main_final.py`）只输出 blob 像素坐标，
   本模块是其上位机升级替代。

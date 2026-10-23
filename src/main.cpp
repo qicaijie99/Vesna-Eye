@@ -8,6 +8,7 @@
 #include "glowtrack/glowtrack.hpp"
 
 #include <opencv2/calib3d.hpp>
+#include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -44,6 +45,8 @@ void printUsage() {
       "  --csv <path>      write per-frame CSV log      (overrides config)\n"
       "  --no-csv          disable CSV logging\n"
       "  --overlay <path>  write annotated mp4 video    (overrides config)\n"
+      "  --display         show the annotated result in a real-time window\n"
+      "  --display-scale F window scale for --display (default 1.0, e.g. 0.6)\n"
       "  --serial <port>   stream TrackPacket to the lower computer\n"
       "  --baud <rate>     lower-computer serial baud rate (default from config)\n"
       "  --cam-baud <rate> OpenMV image-stream baud rate (default: --baud)\n"
@@ -86,6 +89,8 @@ struct Args {
   double fps = -1.0;
   bool no_csv = false;
   bool no_overlay = false;
+  bool display = false;
+  double display_scale = 1.0;
   bool quiet = false;
   bool help = false;
   bool version = false;
@@ -135,6 +140,14 @@ bool parseArgs(int argc, char** argv, Args* args) {
       if (!needStr(&args->debug_dir)) return false;
     } else if (arg == "--no-csv") {
       args->no_csv = true;
+    } else if (arg == "--display") {
+      args->display = true;
+    } else if (arg == "--display-scale") {
+      std::string v;
+      if (!needStr(&v)) return false;
+      args->display_scale = std::atof(v.c_str());
+      if (args->display_scale < 0.2) args->display_scale = 0.2;
+      if (args->display_scale > 2.0) args->display_scale = 2.0;
     } else if (arg == "--no-overlay") {
       args->no_overlay = true;
     } else if (arg == "--quiet") {
@@ -390,6 +403,22 @@ int runTracking(const Args& args) {
     renderer = std::make_unique<OverlayRenderer>(config);
   }
 
+  // Real-time visualization window (OpenCV highgui). If no GUI is available
+  // (headless session) we degrade gracefully to normal batch processing.
+  bool display_enabled = args.display;
+  const char* kDisplayWindow = "green_glow_tracker";
+  if (display_enabled) {
+    try {
+      cv::namedWindow(kDisplayWindow, cv::WINDOW_NORMAL);
+    } catch (const cv::Exception& e) {
+      std::fprintf(stderr, "warning: display unavailable: %s\n", e.what());
+      display_enabled = false;
+    }
+  }
+  if (display_enabled && !renderer) {
+    renderer = std::make_unique<OverlayRenderer>(config);
+  }
+
   std::unique_ptr<SerialPort> serial;
   if (config.output.serial_enabled) {
     serial = SerialPort::open(config.output.serial_port,
@@ -433,6 +462,7 @@ int runTracking(const Args& args) {
       }
     }
 
+    const double frame_start_wall = nowSeconds();
     ScopedTimer timer;
     const TrackOutput output = tracker.update(frame, timestamp, frame_index);
     const double proc_ms = timer.elapsedMs();
@@ -453,12 +483,40 @@ int runTracking(const Args& args) {
         serial.reset();
       }
     }
-    if (renderer && video) {
+    if (renderer && (video || display_enabled)) {
       const cv::Mat overlay =
           renderer->render(frame, output, tracker.lastDetection(),
                            tracker.lastPose(), tracker.currentSearchRoi(),
                            proc_ms, source_fps);
-      video->write(overlay);
+      if (video) {
+        video->write(overlay);
+      }
+      if (display_enabled) {
+        try {
+          if (processed == 1) {
+            cv::resizeWindow(kDisplayWindow,
+                             std::max(1, static_cast<int>(frame.cols * args.display_scale)),
+                             std::max(1, static_cast<int>(frame.rows * args.display_scale)));
+          }
+          cv::imshow(kDisplayWindow, overlay);
+          const int target_ms =
+              std::max(1, static_cast<int>(1000.0 / std::max(source_fps, 1.0)));
+          const int wait_ms =
+              source->isLive()
+                  ? 1
+                  : std::max(1, target_ms -
+                                    static_cast<int>((nowSeconds() - frame_start_wall) * 1000.0));
+          const int key = cv::waitKey(wait_ms);
+          const bool window_visible =
+              cv::getWindowProperty(kDisplayWindow, cv::WND_PROP_VISIBLE) >= 1.0;
+          if (key == 27 || key == 'q' || key == 'Q' || !window_visible) {
+            break;  // user pressed q/ESC or closed the window
+          }
+        } catch (const cv::Exception& e) {
+          std::fprintf(stderr, "warning: display stopped: %s\n", e.what());
+          display_enabled = false;
+        }
+      }
     }
 
     if (!args.quiet && args.print_every > 0 &&
@@ -478,6 +536,13 @@ int runTracking(const Args& args) {
     }
   }
 
+  if (display_enabled) {
+    try {
+      cv::destroyAllWindows();
+    } catch (...) {
+    }
+    display_enabled = false;
+  }
   if (video) {
     video.reset();  // flush
   }
@@ -503,6 +568,9 @@ int runTracking(const Args& args) {
   }
   if (serial) {
     std::printf("serial stream    : running (port closed on exit)\n");
+  }
+  if (args.display) {
+    std::printf("display          : window shown (press q/ESC or close to stop)\n");
   }
   return processed > 0 ? 0 : 1;
 }

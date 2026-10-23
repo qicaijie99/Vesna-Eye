@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+﻿cmake_minimum_required(VERSION 3.16)
 project(green_glow_tracker VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -15,7 +15,7 @@ if(MSVC)
   add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX)
 endif()
 
-find_package(OpenCV 4.5 REQUIRED COMPONENTS core imgproc imgcodecs calib3d videoio)
+find_package(OpenCV 4.5 REQUIRED COMPONENTS core imgproc imgcodecs calib3d videoio highgui)
 message(STATUS "OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
 
 # ---------------------------------------------------------------------------

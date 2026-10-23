@@ -199,7 +199,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_synthetic_valida
 ffmpeg -y -i data\videos\v1_green_target.mp4 -vf "transpose=1,scale=320:180,pad=320:240:0:30:black" -c:v libx264 results\qvga\v1_qvga.mp4
 .\build\Release\glowtrack.exe --config config\openmv_h7plus_qvga.yaml --video results\qvga\v1_qvga.mp4 --csv results\qvga\v1_track.csv --print-every 0 --quiet
 .\build\Release\glowtrack_eval.exe --track results\qvga\v1_track.csv --config config\openmv_h7plus_qvga.yaml --out results\qvga\eval_v1 --label qvga_v1
-# 6) 标定工具回归
+# 6) 可视化演示（标注视频/GIF/九宫格/HTML 看板；-Open 自动打开浏览器）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\make_visual_demo.ps1 -Open
+# 6b) 实时窗口回放（q/ESC 退出）
+.\build\Release\glowtrack.exe --config config\video_720p_phone.yaml --video data\videos\v1_green_target.mp4 --display --display-scale 0.6
+# 7) 标定工具回归
 .\build\Release\glowtrack.exe --mode calibrate --images data\calibration\chess_synth --cols 9 --rows 6 --square-mm 25 --out results\calib_synth.yaml
 ```
 

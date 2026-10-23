@@ -99,14 +99,40 @@ Linux 部署：`cmake -S . -B build -DOpenCV_DIR=<opencv>/lib/cmake/opencv4 && c
 常用参数：`--start-frame` / `--max-frames` / `--print-every 0` / `--quiet` / `--latency-ms`，
 完整列表见 `glowtrack --help`。
 
-## 5. 输出
+## 5. 可视化（回放 / 实时窗口 / 演示看板）
+
+三种查看方式（推荐先看 2）：
+
+1. **实时窗口**（OpenCV highgui，边处理边显示，可同时录制 CSV/视频）：
+
+   ```powershell
+   .\build\Release\glowtrack.exe --config config\video_720p_phone.yaml `
+       --video data\videos\v1_green_target.mp4 --display --display-scale 0.6
+   ```
+
+   窗口内容：蓝色 ROI、红线白盘椭圆、绿线绿光椭圆、PnP 目标坐标轴、视线十字、HUD
+   （状态/角度/角速度/距离/质量/帧率/耗时）。按 `q` / `ESC` 或关闭窗口退出。
+
+2. **一键可视化看板**（标注视频 + GIF + 九宫格 + 曲线 + 指标，自动打开浏览器）：
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\make_visual_demo.ps1 -Open
+   ```
+
+   生成 `results/demo/index.html`、`v1_demo.gif`、`v2_demo.gif`、`*_contact.png`
+   （`results/` 可随时重新生成，不入库；九宫格截图同时复制到 `docs/validation/assets/`）。
+
+3. **直接查看标注视频**：`results/real_validation/v1_overlay.mp4` / `v2_overlay.mp4`
+   （由 `scripts/run_validation.ps1` 生成，720p、30 fps、带完整 HUD）。
+
+## 6. 输出
 
 - 跟踪结果：`yaw`、`pitch`（rad/deg）、`yaw_rate`、`pitch_rate`、`distance_m`、`quality`、`state`。
 - CSV（22 列）：状态、滤波角度/角速度、距离、质量、PnP 原始角度、检测椭圆参数等，便于离线分析与调参。
 - 标注视频：ROI、白盘椭圆、绿光椭圆、PnP 目标坐标轴、视线十字、HUD（角度/距离/状态/帧率/耗时）。
 - 串口协议：19 字节定长包 + CRC-16/CCITT，字段与下位机解析示例见 [`docs/protocol.md`](docs/protocol.md)。
 
-## 6. 验证（详见 [`docs/validation_report.md`](docs/validation_report.md)）
+## 7. 验证（详见 [`docs/validation_report.md`](docs/validation_report.md)）
 
 | 验证 | 结果 |
 | --- | --- |
@@ -125,7 +151,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_validation.ps1 -BuildDir bu
 powershell -ExecutionPolicy Bypass -File scripts\run_synthetic_validation.ps1 -BuildDir build
 ```
 
-## 7. 关键假设与限制
+## 8. 关键假设与限制
 
 - 目标为**平面圆形特征**：白色中心盘为已知直径圆，`target.disc_diameter_mm` 需按实物卡尺测量
   （默认 50 mm）。该尺寸只影响**距离**输出；`yaw/pitch` 对目标模型整体缩放不敏感（理论上严格不变）。
@@ -137,7 +163,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_synthetic_validation.ps1 -B
 - 本模块不出弹道/提前量、不做控制律。
 - 更完整的验证数字与已知偏置见 [`docs/validation_report.md`](docs/validation_report.md) §8、§11。
 
-## 8. 文档索引
+## 9. 文档索引
 
 - [`docs/architecture.md`](docs/architecture.md) — 架构、算法（检测/PnP/Kalman/状态机）、坐标约定
 - [`docs/protocol.md`](docs/protocol.md) — 下位机串口协议 + OpenMV 图像帧流协议

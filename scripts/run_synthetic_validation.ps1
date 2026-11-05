@@ -1,4 +1,4 @@
-# One-command synthetic closed-loop validation for green_glow_tracker.
+# One-command synthetic closed-loop validation for Vesna-Eye.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_synthetic_validation.ps1
 #

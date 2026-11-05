@@ -1,4 +1,4 @@
-// Synthetic validation dataset generator for the green glow tracker.
+// Synthetic validation dataset generator for the Vesna-Eye.
 //
 // Renders the green glowing target (white 3D-printed V-bracket + green glowing
 // diffuser + bright white centre disc used for PnP) at KNOWN 3D poses into PNG

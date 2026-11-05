@@ -150,7 +150,7 @@ $html = @"
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>green_glow_tracker 可视化演示</title>
+<title>Vesna-Eye 可视化演示</title>
 <style>
   body { background:#0f1419; color:#d7dde5; font-family:"Segoe UI","Microsoft YaHei",sans-serif; margin:0; padding:24px 32px 64px; }
   h1 { color:#5ee787; margin:0 0 4px; font-size:26px; }
@@ -176,7 +176,7 @@ $html = @"
 </head>
 <body>
 <h1>绿色发光目标跟踪 · 可视化演示</h1>
-<div class="sub">green_glow_tracker · 绿色光斑检测 + 圆特征 PnP + Kalman 滤波 → yaw / pitch（RoboMaster 无动力滑翔机上位机视觉模块）</div>
+<div class="sub">Vesna-Eye · 绿色光斑检测 + 圆特征 PnP + Kalman 滤波 → yaw / pitch（RoboMaster 无动力滑翔机上位机视觉模块）</div>
 
 <h2>1. 指标总览（两个真实视频）</h2>
 <table>

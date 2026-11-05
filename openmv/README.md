@@ -1,7 +1,7 @@
 # OpenMV 侧说明
 
 本目录只负责 **图像采集与传输**。目标检测、PnP、Kalman 滤波、yaw/pitch 输出全部在
-上位机 C++ 模块 `green_glow_tracker` 中完成（本仓库交付物）。
+上位机 C++ 模块 `Vesna-Eye` 中完成（本仓库交付物）。
 
 ## 1. 文件
 

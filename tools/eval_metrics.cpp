@@ -1,4 +1,4 @@
-﻿// Validation metrics + plots for green_glow_tracker CSV logs.
+﻿// Validation metrics + plots for Vesna-Eye CSV logs.
 //
 //   glowtrack_eval --track <tracker.csv> [--gt <gt.csv>] [--config <yaml>]
 //                  --out <dir> [--label <name>] [--no-plots]

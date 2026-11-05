@@ -1,4 +1,4 @@
-# green_glow_tracker
+# Vesna-Eye
 
 RoboMaster 无主动动力滑翔飞行器 —— **绿色发光目标** 上位机视觉跟踪模块（C++17 / OpenCV / OpenMV）。
 
@@ -6,6 +6,8 @@ RoboMaster 无主动动力滑翔飞行器 —— **绿色发光目标** 上位�
 用 **PnP** 解算目标三维位姿，用 **Kalman 滤波** 平滑/外推视线角，最终以
 **yaw / pitch**（及角速度、距离、置信度）实时输出给下位机，用于解算气动舵面的控制姿态。
 
+> 项目/产品名为 **Vesna-Eye**；命令行工具与可执行文件沿用内部引擎名 `glowtrack`（`glowtrack.exe` 等），构建脚本与验证命令保持不变。
+>
 > 本仓库只包含 **上位机视觉模块**。下位机（飞控/舵机）的航姿解算与控制律不在本仓库范围内；
 > 上位机通过 UART 按固定协议把目标视线角发送给下位机。
 
@@ -37,7 +39,7 @@ RoboMaster 无主动动力滑翔飞行器 —— **绿色发光目标** 上位�
 ## 2. 目录结构
 
 ```
-green_glow_tracker/
+Vesna-Eye/
 ├─ CMakeLists.txt
 ├─ config/                   # 相机内参 / 目标尺寸 / 检测 / PnP / 滤波 / 输出（OpenCV YAML）
 │  ├─ video_720p_phone.yaml   # 两个验证视频（720x1280，fx≈960）

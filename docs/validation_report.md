@@ -1,6 +1,6 @@
 # 验证报告（Validation Report）
 
-本报告验证 `green_glow_tracker` 上位机视觉模块（绿色发光目标检测 + 圆特征 PnP + Kalman 滤波 →
+本报告验证 `Vesna-Eye` 上位机视觉模块（绿色发光目标检测 + 圆特征 PnP + Kalman 滤波 →
 yaw/pitch 输出）在两个给定视频上的功能、精度、实时性与鲁棒性。
 
 - 验证日期：2026-10-23

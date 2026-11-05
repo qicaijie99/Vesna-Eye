@@ -1,4 +1,4 @@
-// Command line entry point of the green glow tracker.
+// Command line entry point of the Vesna-Eye.
 //
 //   Track mode (default) -- run the full vision pipeline on a video, an image
 //   sequence or a live camera and write CSV / overlay / serial outputs.
@@ -28,7 +28,7 @@ constexpr const char* kVersion = "0.1.0";
 
 void printUsage() {
   std::printf(
-      "green_glow_tracker %s -- upper-computer vision module for a green glowing\n"
+      "Vesna-Eye %s -- upper-computer vision module for a green glowing\n"
       "target (RM unpowered glider project). Detects the green glow, solves the\n"
       "target pose with PnP, filters the line-of-sight angles and streams yaw/pitch\n"
       "to the lower computer.\n\n"
@@ -406,7 +406,7 @@ int runTracking(const Args& args) {
   // Real-time visualization window (OpenCV highgui). If no GUI is available
   // (headless session) we degrade gracefully to normal batch processing.
   bool display_enabled = args.display;
-  const char* kDisplayWindow = "green_glow_tracker";
+  const char* kDisplayWindow = "Vesna-Eye";
   if (display_enabled) {
     try {
       cv::namedWindow(kDisplayWindow, cv::WINDOW_NORMAL);
@@ -587,7 +587,7 @@ int main(int argc, char** argv) {
     return 0;
   }
   if (args.version) {
-    std::printf("green_glow_tracker %s (OpenCV %s)\n", kVersion, CV_VERSION);
+    std::printf("Vesna-Eye %s (OpenCV %s)\n", kVersion, CV_VERSION);
     return 0;
   }
   if (args.mode == "calibrate") {

@@ -1,4 +1,4 @@
-# Build script for the green_glow_tracker (Windows / MSVC / prebuilt OpenCV).
+# Build script for the Vesna-Eye (Windows / MSVC / prebuilt OpenCV).
 #
 #   powershell -ExecutionPolicy Bypass -File scripts/build.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts/build.ps1 -Targets glowtrack_tests

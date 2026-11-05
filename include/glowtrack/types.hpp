@@ -1,5 +1,5 @@
 #pragma once
-// Core data types shared by every module of the green glow tracker.
+// Core data types shared by every module of the Vesna-Eye.
 //
 // Conventions
 // -----------

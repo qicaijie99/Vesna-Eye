@@ -1,6 +1,6 @@
 # 架构与算法设计
 
-本文档说明 `green_glow_tracker` 上位机视觉模块的整体架构、各模块职责、核心算法与坐标约定。
+本文档说明 `Vesna-Eye` 上位机视觉模块的整体架构、各模块职责、核心算法与坐标约定。
 验证方法与结果见 `docs/validation_report.md`，串口协议见 `docs/protocol.md`。
 
 ## 1. 系统定位

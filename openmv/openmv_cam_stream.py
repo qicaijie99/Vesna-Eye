@@ -1,7 +1,7 @@
 # OpenMV Cam H7 Plus -- green glow target camera stream
 #
 # This script only captures images and streams them to the upper-computer C++
-# vision module (green_glow_tracker). All target detection / PnP / Kalman
+# vision module (Vesna-Eye). All target detection / PnP / Kalman
 # filtering runs on the host; the OpenMV stays a "smart camera" that delivers
 # JPEG frames with a byte stream protocol.
 #

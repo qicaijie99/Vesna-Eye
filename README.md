@@ -131,6 +131,8 @@ Linux 部署：`cmake -S . -B build -DOpenCV_DIR=<opencv>/lib/cmake/opencv4 && c
 - CSV（22 列）：状态、滤波角度/角速度、距离、质量、PnP 原始角度、检测椭圆参数等，便于离线分析与调参。
 - 标注视频：ROI、白盘椭圆、绿光椭圆、PnP 目标坐标轴、视线十字、HUD（角度/距离/状态/帧率/耗时）。
 - 串口协议：19 字节定长包 + CRC-16/CCITT，字段与下位机解析示例见 [`docs/protocol.md`](docs/protocol.md)。
+  注意：当前协议包**不含时间戳**（`seq` 仅为 8 位帧序号），时间戳/同步细节见
+  [`docs/timing_and_sync.md`](docs/timing_and_sync.md)。
 
 ## 7. 验证（详见 [`docs/validation_report.md`](docs/validation_report.md)）
 
@@ -167,6 +169,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_synthetic_validation.ps1 -B
 
 - [`docs/architecture.md`](docs/architecture.md) — 架构、算法（检测/PnP/Kalman/状态机）、坐标约定
 - [`docs/protocol.md`](docs/protocol.md) — 下位机串口协议 + OpenMV 图像帧流协议
+- [`docs/timing_and_sync.md`](docs/timing_and_sync.md) — 时间戳语义、串口输出时序与下位机同步建议（**下位机对接必读**）
 - [`docs/calibration.md`](docs/calibration.md) — 相机标定、OpenMV 默认内参、目标尺寸标定
 - [`docs/validation_report.md`](docs/validation_report.md) — 验证方法、指标、曲线、限制与复现命令
 - [`docs/recon_target_analysis.md`](docs/recon_target_analysis.md) — 目标图像侦察（视频分析结论）

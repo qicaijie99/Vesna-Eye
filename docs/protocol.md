@@ -119,7 +119,22 @@ UART 需要 ≥ 4.5 Mbaud（8N1 有效 10 bit/byte），因此高速场景优先
 
 ---
 
-## 3. 标定文件格式（相机内参）
+## 3. 时间戳与同步（重要）
+
+- 当前跟踪结果包（19 B）**不包含任何时间戳字段**；`seq` 只是 8 位帧序号（0–255 循环），
+  只能用于丢包检测，不能作为时钟；
+- 上位机时间基准为进程内 `std::chrono::steady_clock`（进程启动为 0 点），不是绝对时间/UTC；
+- 各帧源的时间戳语义不同（视频=容器媒体时间；图像序列=index/fps；相机/OpenMV=主机单调时钟，
+  OpenMV 为"整帧接收+解码完成"时刻，帧协议无相机端时间戳）；
+- 串口**每处理一帧发一包**，不是固定频率节拍；`valid=false` 时也会发（`flags.bit0=0`）；
+- 延时补偿 `kalman.latency_compensation_ms`（默认 0）是配置常量，作用于输出角度的前推，
+  不是实测的端到端延迟。
+
+各时间戳定义、dt 计算/钳制、端到端延迟构成，以及给下位机的对接建议
+（短期：到达时间+seq 丢包检测；中期：协议 v2 增加 `host_time_ms`/`proc_ms` 或周期同步包；
+OpenMV 帧协议增加 `capture_ms`）详见 **[`timing_and_sync.md`](timing_and_sync.md)**。
+
+## 4. 标定文件格式（相机内参）
 
 `glowtrack --mode calibrate` 输出 YAML（OpenCV FileStorage）：
 

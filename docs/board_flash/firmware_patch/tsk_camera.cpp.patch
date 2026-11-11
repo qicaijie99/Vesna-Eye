@@ -1,0 +1,155 @@
+--- a/Task/src/tsk_camera.cpp
++++ b/Task/src/tsk_camera.cpp
+@@ -20,8 +20,9 @@
+ #include "main.h"
+ 
+ #include <cstddef>
+ #include <cstdint>
++#include <cstring>
+ 
+ namespace
+ {
+ 
+@@ -56,9 +57,34 @@
+ bool captureResourcesOwned = false;
+ volatile uint32_t framesCaptured = 0U;
+ volatile uint32_t captureErrors = 0U;
+ volatile uint32_t lastFrameTick = 0U;
++volatile uint32_t invalidFrames = 0U;
++bool sensorStreaming = false;
++uint8_t captureRetryCount = 0U;
++constexpr uint8_t kMaxCaptureRetries = 2U;
+ H750_DMA_BUFFER uint8_t defaultFrameBuffer[Camera::kDefaultFrameByteLength] = {};
++
++// A stale DMA buffer repeats a constant byte pattern (e.g. 0x20 0x00), so
++// counting distinct byte values is a cheap "did the sensor actually write?"
++// check. Real image data has many distinct values even in a flat scene.
++bool FrameBufferLooksValid(const uint8_t *buffer, uint32_t length)
++{
++    if ((buffer == nullptr) || (length < 256U)) {
++        return false;
++    }
++    bool seen[256] = {};
++    uint32_t distinct = 0U;
++    const uint32_t sample = (length < 8192U) ? length : 8192U;
++    for (uint32_t i = 0U; i < sample; ++i) {
++        const uint8_t value = buffer[i];
++        if (!seen[value]) {
++            seen[value] = true;
++            ++distinct;
++        }
++    }
++    return distinct > 16U;
++}
+ 
+ void SetResetAsserted(bool asserted)
+ {
+     const bool driveHigh = Camera::kResetActiveLow ? !asserted : asserted;
+@@ -153,11 +179,13 @@
+     if (captureResourcesOwned && (stopResult == HAL_OK) &&
+         (HAL_DMA_GetState(hdcmi.DMA_Handle) != HAL_DMA_STATE_READY)) {
+         stopResult = HAL_ERROR;
+     }
+-    const Camera::Result sensorResult = Ov5640::GetStatus().initialized
+-                                           ? MapSensorResult(Ov5640::Stop())
+-                                           : Camera::Result::Ok;
++    // Keep the sensor streaming between snapshots: OV5640_Stop() sets the
++    // sensor software power-down bit (0x3008 = 0x42) and OV5640_Start() alone
++    // does not restore the full register configuration, so the following
++    // capture would receive no pixel data. Only the DCMI capture is stopped.
++    const Camera::Result sensorResult = Camera::Result::Ok;
+     frameEventPending = false;
+     captureErrorPending = false;
+     if (stopResult == HAL_OK) {
+         InvalidateCaptureBuffer();
+@@ -194,13 +222,36 @@
+         frameEventPending = false;
+         if (captureMode == CaptureMode::Snapshot) {
+             captureActive = false;
+             const bool frameFailed = captureErrorPending;
++            uint8_t *const buffer = captureBuffer;
++            const uint32_t length = captureBufferLength;
++            InvalidateCaptureBuffer();
++            const bool bufferValid =
++                !frameFailed && FrameBufferLooksValid(buffer, length);
+             const Result result = ReleaseCaptureResources();
+-            frameReady = (result == Result::Ok) && !frameFailed;
+-            state = frameReady ? State::Ready : State::Error;
+-            if (!frameReady && !frameFailed) {
+-                ++captureErrors;
++            if ((result == Result::Ok) && !frameFailed && bufferValid) {
++                frameReady = true;
++                state = State::Ready;
++                captureRetryCount = 0U;
++            } else if ((result == Result::Ok) && !frameFailed &&
++                       (captureRetryCount < kMaxCaptureRetries)) {
++                ++captureRetryCount;
++                ++invalidFrames;
++                state = State::Ready;
++                if (StartCapture(buffer, length, CaptureMode::Snapshot) != Result::Ok) {
++                    frameReady = false;
++                    state = State::Error;
++                    ++captureErrors;
++                }
++                return;
++            } else {
++                frameReady = false;
++                state = State::Error;
++                if (!frameFailed) {
++                    ++invalidFrames;
++                    ++captureErrors;
++                }
+             }
+         } else {
+             InvalidateCaptureBuffer();
+             frameReady = true;
+@@ -243,8 +294,9 @@
+ {
+     (void)ReleaseCaptureResources();
+     frameReady = false;
+     Ov5640::Deinitialize();
++    sensorStreaming = false;
+     SetResetAsserted(true);
+     SetPowerDownAsserted(true);
+     phaseStartTick = nowMs;
+     // Hardware reset can recover failed sensor register access, but must not
+@@ -258,8 +310,9 @@
+     const Result stopResult = ReleaseCaptureResources();
+     frameReady = false;
+     startupPhase = StartupPhase::Idle;
+     Ov5640::Deinitialize();
++    sensorStreaming = false;
+     SetResetAsserted(true);
+     SetPowerDownAsserted(true);
+     state = (stopResult == Result::Ok) ? State::PoweredDown : State::Error;
+     return stopResult;
+@@ -337,20 +390,25 @@
+     if (state != State::Ready) {
+         return Result::NotReady;
+     }
+ 
+-    const Result sensorStartResult = MapSensorResult(Ov5640::Start());
+-    if (sensorStartResult != Result::Ok) {
+-        state = State::Error;
+-        return sensorStartResult;
++    if (!sensorStreaming) {
++        const Result sensorStartResult = MapSensorResult(Ov5640::Start());
++        if (sensorStartResult != Result::Ok) {
++            state = State::Error;
++            return sensorStartResult;
++        }
++        sensorStreaming = true;
++        HAL_Delay(20U);  // let the sensor PLL/streaming settle before DCMI
+     }
+ 
+     captureBuffer = buffer;
+     captureBufferLength = byteLength;
+     captureMode = mode;
+     frameReady = false;
+     frameEventPending = false;
+     captureErrorPending = false;
++    std::memset(captureBuffer, 0, byteLength);
+     SCB_CleanInvalidateDCache_by_Addr(reinterpret_cast<uint32_t *>(captureBuffer),
+                                      static_cast<int32_t>(captureBufferLength));
+ 
+     const uint32_t halMode = (mode == CaptureMode::Continuous) ? DCMI_MODE_CONTINUOUS : DCMI_MODE_SNAPSHOT;

@@ -71,7 +71,7 @@ Windows 侧 `dfu-util` 需要先给 `0483:df11` 安装 WinUSB/libusb 驱动（Za
 | `VIDEO RECORD` | `VIDEO DONE FILE=REC000.AVI FRAMES=84 ELAPSED_MS=15021 LATE=83`（命令链路 OK，**但图像内容为常量，见 §3.1**）⚠️ |
 | SD 文件 | `FILE REC000.AVI 12904660 32`（约 12.3 MiB，内容待确认）⚠️ |
 
-### 3.1 上板后发现的问题：相机图像为常量（未通过）
+### 3.1 上板后发现的问题：相机图像为常量（已修复，见 §3.2）
 
 烧录后进一步用 `CAMERA SNAP` 抓取单帧（协议：`FRAME BEGIN RGB565 320 240 153600` +
 153600 B 原始 RGB565 + `FRAME END`），结果：
@@ -95,6 +95,46 @@ frame 2 sha 85fc7399227dac61 first16 [32, 0, 32, 0, ...]
 结论：**固件烧录与命令链路可用，但视觉图像数据通路尚未验证通过**，需要继续排查
 （硬件信号 + 固件诊断）后才能说“视觉软件可用”。
 
+### 3.2 固件修复与重烧验证（已通过）
+
+针对 §3.1 的常量帧问题，修改了固件相机任务 `Task/src/tsk_camera.cpp`：
+
+1. **抓帧之间不再给传感器掉电**：`ReleaseCaptureResources()` 不再调用 `Ov5640::Stop()`
+   （该函数写 `0x3008=0x42` 进入软件掉电，而 `Ov5640::Start()` 只写 `0x02`，不会恢复完整
+   寄存器配置，导致下一次抓帧没有像素数据）；只停止 DCMI。
+2. **传感器只启动一次**：`StartCapture()` 用 `sensorStreaming` 标记，首次启动后延时 20 ms
+   让 PLL/输出稳定，后续抓帧只重启 DCMI。
+3. **抓帧前清零 DMA 缓冲区**（`memset` + cache clean），避免把 NOLOAD 段残留内容当成图像。
+4. **帧有效性校验 + 重试**：按前 8 KiB 的不同字节值数量判断是否真实图像（常量帧只有 2 种值），
+   无效则自动重试最多 2 次，再失败才报错。
+5. 新增 `invalidFrames`/`captureRetryCount` 内部计数，便于后续诊断。
+
+编译与烧录：
+
+- 工具链：Arm GNU Toolchain 14.2.Rel1 + Ninja 1.13.2 + CMake；
+- **Debug 构建在 GCC 14 下超出 128 KiB Flash 248 B**，因此改用 **Release** 构建：
+  `FLASH 77,420 B / 128 KiB (59.07 %)`，生成镜像 77,420 B；
+- 烧录方式同 §2（USB BOOT → ROM DFU → dfu-util `-a 0 -s 0x08000000:leave`）；
+- 补丁文件：[`board_flash/firmware_patch/tsk_camera.cpp.patch`](board_flash/firmware_patch/tsk_camera.cpp.patch)。
+
+修复后验证（同一块板、同一相机）：
+
+| 检查 | 结果 |
+| --- | --- |
+| 连续 5 次 `CAMERA SNAP` | **5/5 有效**（distinct 254–255、非零 100%、SHA 各不相同）✅ |
+| 连续 10 帧 | 10 个不同 SHA，全部有效 ✅ |
+| 单帧耗时 | 约 0.47 s（采集等待 ~0.16 s + USB 传输 ~0.32 s）→ 约 **2.1 fps** |
+| `VIDEO RECORD` | `VIDEO DONE FILE=REC001.AVI FRAMES=61 ELAPSED_MS=15107 LATE=59` ✅ |
+| AVI 内容 | `SD GET` 下载 9,371,308 B（240 KiB/s，38 s）；前 4 帧 SHA 各不相同、图像正常 ✅ |
+
+![修复后抓取的图像帧](board_flash/camera_frame_after_fix.png)
+
+![修复后录像 AVI 中的一帧](board_flash/avi_frame_after_fix.png)
+
+结论：**相机链路与固件抓帧/录像功能已可用**。剩余限制：受 USB CDC 传输 153,600 B/帧
+（约 0.32 s）与采集等待（约 0.16 s）限制，当前约 **2 fps**；若要作为 Vesna-Eye 实时图像源，
+还需降低分辨率/改用 JPEG 压缩或提高链路吞吐，并实现上位机帧源对接。
+
 说明：
 
 - 固件 `HELP` 文本未更新，仍未列出 `VIDEO`/`SD` 命令，但命令实际可用（源码中
@@ -114,6 +154,9 @@ frame 2 sha 85fc7399227dac61 first16 [32, 0, 32, 0, ...]
 | `board/dart_control_H7/backup_before_flash_002B00303333510D36353234.bin` | 烧录前备份（131,072 B） |
 | `docs/board_flash/flash_log.txt` | dfu-util 烧录日志 |
 | `docs/board_flash/video_record_console.log` | `VIDEO RECORD` 串口输出 |
+| `docs/board_flash/firmware_patch/tsk_camera.cpp.patch` | 相机抓帧修复补丁 |
+| `board/dart_control_H7/dart_control_H7/build_local/Release/GMStdRobotLib.elf` | 修复后 Release 固件（77,420 B Flash） |
+| `board/dart_control_H7/dart_control_H7/build_local/Release/GMStdRobotLib_dfu.bin` | 修复后烧录镜像 |
 
 > `board/` 与 `dart_control_H7.zip` 已加入 `.gitignore`，不进入视觉模块仓库。
 
@@ -126,14 +169,13 @@ frame 2 sha 85fc7399227dac61 first16 [32, 0, 32, 0, ...]
 
 ## 5. 后续建议（按优先级）
 
-1. **先解决图像为常量的问题**（视觉可用性的前提）：
-   - 硬件：检查相机 FPC 排线/连接器是否完全插入、2V8/1V5 电源轨、MCLK/PCLK 波形、
-     数据线 D0–D7 与 HSYNC/VSYNC；可尝试更换相机模块或重新插拔排线；
-   - 固件：增加 DCMI 寄存器/帧计数诊断、抓帧前清零 DMA 缓冲区、开启 OV5640 彩条
-     （`Camera::EnableColorBar`）以区分“传感器输出问题”与“DCMI 接收问题”；
-     重新编译需安装 ARM GNU Toolchain（本机暂未安装）。
-2. 图像通路正常后，若 Vesna-Eye 需要直接使用该板相机图像，实现对应的帧传输协议
-   （`CAMERA SNAP` 的 `FRAME BEGIN/END` 帧流或 `SD GET` 导出 AVI），并在 `FrameSource`
-   中增加该图像源；当前仓库只支持视频/图像序列/USB 相机/OpenMV 串口流。
-3. `LATE=83` 偏高（约 5.6 fps），在图像正常后排查 DCMI/DMA 与 SD 写入速度。
-4. 板卡 `HELP` 文本建议补充 `VIDEO RECORD`、`SD FILES` 等命令，便于现场调试。
+1. **图像为常量问题已修复**（§3.2），相机抓帧/录像可用。
+2. **提升帧率/实时性**：当前约 2 fps（USB 传输 153,600 B/帧 ≈ 0.32 s + 采集 ≈ 0.16 s）。
+   可选：降低分辨率、板上 JPEG 压缩后传输、改用 USB 批量端点或更高吞吐链路；
+   若作为 Vesna-Eye 实时图像源，需要先解决吞吐问题。
+3. **Vesna-Eye 对接**：实现该板帧传输协议（`CAMERA SNAP` 的 `FRAME BEGIN/END` 帧流）
+   的 `FrameSource`，或在 `VIDEO RECORD` 后用 `SD GET` 导出 AVI 做离线验证；
+   当前上位机只支持视频/图像序列/USB 相机/OpenMV 串口流。
+4. **构建说明**：GCC 14.2 下 Debug 超 Flash 248 B，需用 Release 或给 Debug 加 `-Os`；
+   后续修改固件请沿用 `docs/board_flash/firmware_patch/` 的补丁与本文构建步骤。
+5. 板卡 `HELP` 文本建议补充 `VIDEO RECORD`、`SD FILES` 等命令，便于现场调试。

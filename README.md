@@ -172,6 +172,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_synthetic_validation.ps1 -B
 - [`docs/architecture.md`](docs/architecture.md) — 架构、算法（检测/PnP/Kalman/状态机）、坐标约定
 - [`docs/protocol.md`](docs/protocol.md) — 下位机串口协议 + OpenMV 图像帧流协议
 - [`docs/timing_and_sync.md`](docs/timing_and_sync.md) — 时间戳语义、串口输出时序与下位机同步建议（**下位机对接必读**）
+- [`docs/board_flash_report.md`](docs/board_flash_report.md) — DART Control H7 视觉固件上板记录（USB BOOT→ROM DFU 烧录、上板验证、限制）
 - [`docs/calibration.md`](docs/calibration.md) — 相机标定、OpenMV 默认内参、目标尺寸标定
 - [`docs/validation_report.md`](docs/validation_report.md) — 验证方法、指标、曲线、限制与复现命令
 - [`docs/recon_target_analysis.md`](docs/recon_target_analysis.md) — 目标图像侦察（视频分析结论）

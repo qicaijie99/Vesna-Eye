@@ -36,3 +36,7 @@ __pycache__/
 .vscode/
 .idea/
 *.swp
+
+# Board firmware package / extracted working tree (large, not part of the vision module)
+dart_control_H7.zip
+board/

@@ -68,8 +68,32 @@ Windows 侧 `dfu-util` 需要先给 `0483:df11` 安装 WinUSB/libusb 驱动（Za
 | `PARAMS` | UID 不变 `002B00303333510D36353234`，`USB_BOOT=ROM_DFU_V1` ✅ |
 | `STATUS DETAIL` | `MODE=USB_CAMERA_STANDALONE`、`CAMERA=READY`、`CAM_ID=0x5640`、`SD=MOUNTED`、`I2C_ERR=0` ✅ |
 | 新固件命令 `SD FILES` | `FILES END`（旧固件无此命令）✅ |
-| `VIDEO RECORD` | `VIDEO DONE FILE=REC000.AVI FRAMES=84 ELAPSED_MS=15021 LATE=83` ✅ |
-| SD 文件 | `FILE REC000.AVI 12904660 32`（约 12.3 MiB）✅ |
+| `VIDEO RECORD` | `VIDEO DONE FILE=REC000.AVI FRAMES=84 ELAPSED_MS=15021 LATE=83`（命令链路 OK，**但图像内容为常量，见 §3.1**）⚠️ |
+| SD 文件 | `FILE REC000.AVI 12904660 32`（约 12.3 MiB，内容待确认）⚠️ |
+
+### 3.1 上板后发现的问题：相机图像为常量（未通过）
+
+烧录后进一步用 `CAMERA SNAP` 抓取单帧（协议：`FRAME BEGIN RGB565 320 240 153600` +
+153600 B 原始 RGB565 + `FRAME END`），结果：
+
+```text
+frame 0 sha 85fc7399227dac61 first16 [32, 0, 32, 0, ...]
+frame 1 sha 85fc7399227dac61 first16 [32, 0, 32, 0, ...]
+frame 2 sha 85fc7399227dac61 first16 [32, 0, 32, 0, ...]
+```
+
+- 3 帧**逐字节完全相同**，153600 B 中只有 `0x20` 和 `0x00` 两种字节（每像素恒为
+  RGB565 `0x0020`），不是真实图像（真实传感器必然有噪声/场景差异）；
+- `VIDEO RECORD` 能完成并写出 84 帧 AVI，但内容同样是常量；
+- `CAMERA TEST` 返回 `CAMERA PASS ID=0x5640`，但它只校验 I2C 传感器 ID/状态，**不校验图像数据**；
+- `CAMERA DIAG` 显示 I2C/GPIO 正常（SCL=1 SDA=1 RESETB=1 PWDN=0），`CAMERA PROBE` 读到 ID `0x5640`；
+- 代码里 `defaultFrameBuffer` 位于 `.dma_buffer (NOLOAD)` 段（启动不初始化），
+  快照路径只根据 DCMI 帧事件判定“帧就绪”，不校验 DMA 是否真的写入了有效像素；
+  因此常量帧可能是 **DCMI 数据未真正写入**（数据线/FPC/PCLK/MCLK/电源）或
+  **传感器未进入输出模式**，而非简单的“画面全黑”。
+
+结论：**固件烧录与命令链路可用，但视觉图像数据通路尚未验证通过**，需要继续排查
+（硬件信号 + 固件诊断）后才能说“视觉软件可用”。
 
 说明：
 
@@ -100,9 +124,16 @@ Windows 侧 `dfu-util` 需要先给 `0483:df11` 安装 WinUSB/libusb 驱动（Za
 3. 按 `USB_BOOT_GUIDE.md` 使用 STM32CubeProgrammer + `flash_usb.ps1`，或按本文 WSL + usbipd 方案烧录
    `build/Debug/GMStdRobotLib.elf`。
 
-## 5. 后续建议
+## 5. 后续建议（按优先级）
 
-1. 若 Vesna-Eye 需要直接使用该板相机图像，需实现对应的帧传输协议（USB 帧流或 `SD GET` 导出 AVI），
-   再在 `FrameSource` 中增加该图像源；当前仓库只支持视频/图像序列/USB 相机/OpenMV 串口流。
-2. `LATE=83` 偏高，建议排查 DCMI/DMA 配置、SD 写入速度或降低目标帧率，避免影响实时性。
-3. 板卡 `HELP` 文本建议补充 `VIDEO RECORD`、`SD FILES` 等命令，便于现场调试。
+1. **先解决图像为常量的问题**（视觉可用性的前提）：
+   - 硬件：检查相机 FPC 排线/连接器是否完全插入、2V8/1V5 电源轨、MCLK/PCLK 波形、
+     数据线 D0–D7 与 HSYNC/VSYNC；可尝试更换相机模块或重新插拔排线；
+   - 固件：增加 DCMI 寄存器/帧计数诊断、抓帧前清零 DMA 缓冲区、开启 OV5640 彩条
+     （`Camera::EnableColorBar`）以区分“传感器输出问题”与“DCMI 接收问题”；
+     重新编译需安装 ARM GNU Toolchain（本机暂未安装）。
+2. 图像通路正常后，若 Vesna-Eye 需要直接使用该板相机图像，实现对应的帧传输协议
+   （`CAMERA SNAP` 的 `FRAME BEGIN/END` 帧流或 `SD GET` 导出 AVI），并在 `FrameSource`
+   中增加该图像源；当前仓库只支持视频/图像序列/USB 相机/OpenMV 串口流。
+3. `LATE=83` 偏高（约 5.6 fps），在图像正常后排查 DCMI/DMA 与 SD 写入速度。
+4. 板卡 `HELP` 文本建议补充 `VIDEO RECORD`、`SD FILES` 等命令，便于现场调试。

@@ -1,0 +1,17 @@
+WIN640 HTS=1936 VTS= 800 -> capture 128 ms, 7.81 fps
+    SNAP1 end-to-end 0.134s -> 7.44 fps payload=2400
+WIN640 HTS=1936 VTS= 612 -> capture 97 ms, 10.31 fps
+    SNAP1 end-to-end 0.085s -> 11.81 fps payload=2400
+WIN640 HTS=1936 VTS= 400 -> capture 64 ms, 15.62 fps
+    SNAP1 end-to-end 0.053s -> 18.71 fps payload=2400
+WIN640 HTS=1936 VTS= 300 -> capture 49 ms, 20.41 fps
+    SNAP1 end-to-end 0.055s -> 18.04 fps payload=2400
+WIN640 HTS=1936 VTS= 268 -> capture 44 ms, 22.73 fps
+    SNAP1 end-to-end 0.046s -> 21.78 fps payload=2400
+WIN640 HTS=1936 VTS= 248 -> capture 40 ms, 25.00 fps
+    SNAP1 end-to-end 0.045s -> 22.32 fps payload=2400
+WIN640 HTS=1936 VTS= 200 -> FAIL ['ERR BENCH CAPTURE']
+WIN640 HTS=1936 VTS= 160 -> FAIL ['ERR BENCH CAPTURE']
+=== restore ===
+RESET  -> ['OK CAMERA RESET']
+STATUS -> ['POWER=RUNNING F4=OFFLINE CAMERA=READY SD=MOUNTED USB=CONFIGURED']

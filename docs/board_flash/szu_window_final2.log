@@ -1,0 +1,22 @@
+=== A: window only (no PLL2) ===
+  WIN  -> ['OK WIN 0468 0358 05B7 044F 0790 0090 0004 0002']
+  window: capture 23 ms -> 43.48 fps
+  window SNAP1: end-to-end 0.038s -> 26.39 fps (capture_wait=0.028s transfer=0.010s payload=2400)
+  window SNAP8: end-to-end 0.099s -> 10.07 fps (capture_wait=0.024s transfer=0.076s payload=19200)
+=== B: PLL2 then window ===
+  PLL2 -> ['OK CAMERA PLL2']
+  WIN  -> ['OK WIN 0468 0358 05B7 044F 0790 0090 0004 0002']
+  window+pll2: capture FAIL ['ERR BENCH CAPTURE']
+  window+pll2 SNAP1: FAIL ERR STREAM CAPTURE
+  window+pll2 SNAP8: FAIL ERR STREAM CAPTURE
+=== C: window then PLL2 direct WR ===
+  WIN  -> ['OK WIN 0468 0358 05B7 044F 0790 0090 0004 0002']
+  CAMERA WR 3036 C0 -> ['OK W 3036=C0']
+  CAMERA WR 3037 13 -> ['OK W 3037=13']
+  window+pll2wr: capture FAIL ['ERR BENCH CAPTURE']
+  window+pll2wr SNAP1: FAIL ERR STREAM CAPTURE
+  window+pll2wr SNAP8: FAIL ERR STREAM CAPTURE
+=== restore ===
+RESET  -> ['OK CAMERA RESET']
+STATUS -> ['POWER=RUNNING F4=OFFLINE CAMERA=READY SD=MOUNTED USB=CONFIGURED']
+PING   -> ['PONG']
